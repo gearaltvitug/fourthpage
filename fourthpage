@@ -1,0 +1,762 @@
+            package com.example.one;
+
+            import static com.example.one.SecondPage.EXTRA_NAME;
+
+            import android.annotation.SuppressLint;
+            import android.content.Intent;
+            import android.content.res.ColorStateList;
+            import android.graphics.Color;
+            import android.graphics.Typeface;
+            import android.os.Bundle;
+            import android.os.Parcelable;
+            import android.util.Log;
+            import android.util.Pair;
+            import android.view.View;
+            import android.widget.Button;
+            import android.widget.EditText;
+            import android.widget.ImageView;
+            import android.widget.ProgressBar;
+            import android.widget.TextView;
+            import android.widget.Toast;
+
+            import androidx.activity.EdgeToEdge;
+            import androidx.annotation.NonNull;
+            import androidx.appcompat.app.AppCompatActivity;
+            import androidx.core.content.res.ResourcesCompat;
+
+            import com.github.mikephil.charting.charts.LineChart;
+            import com.github.mikephil.charting.components.AxisBase;
+            import com.github.mikephil.charting.components.LimitLine;
+            import com.github.mikephil.charting.components.XAxis;
+            import com.github.mikephil.charting.components.YAxis;
+            import com.github.mikephil.charting.data.Entry;
+            import com.github.mikephil.charting.data.LineData;
+            import com.github.mikephil.charting.data.LineDataSet;
+            import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+            import com.github.mikephil.charting.formatter.ValueFormatter;
+            import com.github.mikephil.charting.highlight.Highlight;
+            import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
+            import com.google.android.gms.tasks.OnCompleteListener;
+            import com.google.android.gms.tasks.Task;
+            import com.google.firebase.database.DataSnapshot;
+            import com.google.firebase.database.DatabaseError;
+            import com.google.firebase.database.DatabaseReference;
+            import com.google.firebase.database.FirebaseDatabase;
+            import com.google.firebase.database.ValueEventListener;
+
+            import java.util.ArrayList;
+            import java.util.Arrays;
+            import java.util.HashMap;
+            import java.util.List;
+            import java.util.Map;
+            import java.util.concurrent.SubmissionPublisher;
+
+            import www.sanju.motiontoast.MotionToast;
+            import www.sanju.motiontoast.MotionToastStyle;
+
+            public class FourthPage extends AppCompatActivity {
+
+
+            //    float phValue = 0f;
+                float nitrogenValue = 0f;
+                float phosphorusValue = 0f;
+                float potassiumValue = 0f;
+                double pHValue = 0.0;
+
+                List<Entry> nitrogenEntries = new ArrayList<>();
+                List<Entry> potassiumEntries = new ArrayList<>();
+                List<Entry> phosEntries = new ArrayList<>();
+
+
+                List<Pair<Long, Float>> nitrogenReadings = new ArrayList<>();
+                List<Pair<Long, Float>> phosphorusReadings = new ArrayList<>();
+                List<Pair<Long, Float>> potassiumReadings = new ArrayList<>();
+
+                Map<String, Map<String, String>> NitrogenRecommendations = new HashMap<>();
+                Map<String, Map<String, String>> phosphorusRecommendations = new HashMap<>();
+                Map<String, Map<String, String >> potassiumRecommendations = new HashMap<>();
+
+
+
+
+                EditText id;
+                DatabaseReference databaseUsers;
+                Button button;
+
+                TextView tvPHValue;
+
+
+
+                //ali ne mag balik
+            //    @SuppressLint("MissingSuperCall")
+            //    @Override
+            ////    public void onBackPressed() {
+            ////        // Leave this empty to prevent going back
+            ////    }
+
+
+                @SuppressLint("MissingInflatedId")
+                @Override
+                protected void onCreate(Bundle savedInstanceState) {
+                    super.onCreate(savedInstanceState);
+                    Log.d("FourthPage", "Applied theme: " + getTheme());
+                    EdgeToEdge.enable(this);
+                    setContentView(R.layout.activity_fourth_page);
+
+                    LineChart lineChart = findViewById(R.id.lineChartpH);
+                    LineChart linechartNitro = findViewById(R.id.lineCharNitro);
+
+
+                    LineChart linechartPhos = findViewById(R.id.lineCharPhos);
+
+                    ProgressBar progressBarpH = findViewById(R.id.pbpH);
+
+                    tvPHValue = findViewById(R.id.tvPHValue);
+
+                    //recommended nitro
+                    //rice
+                    Map<String, String> riceRecommendations = new HashMap<>();
+                    riceRecommendations.put("low", "Low for this crop.");
+                    riceRecommendations.put("midlow", "Midlow for this crop.");
+                    riceRecommendations.put("midhigh", "MidHigh for this crop.");
+                    riceRecommendations.put("high", "High this crop.");
+                    riceRecommendations.put("veryhigh", "VeryHigh for this crop.");
+                    NitrogenRecommendations.put("Rice", riceRecommendations);
+
+
+
+                    //recommend phos
+                    //rice
+                    Map<String, String> ricePhosphorusRecommendations = new HashMap<>();
+                    ricePhosphorusRecommendations.put("low", "Suboptimal for this crop.");
+                    ricePhosphorusRecommendations.put("mid", "Moderate for this crop.");
+                    ricePhosphorusRecommendations.put("high", "Suitable for this crop.");
+                    phosphorusRecommendations.put("Rice", ricePhosphorusRecommendations);
+
+
+
+                    //recommend potas
+                    //rice
+                    Map<String, String> ricePotassium = new HashMap<>();
+                    ricePotassium.put("low", "Suboptimal for this crop.");
+                    ricePotassium.put("mid", "Moderate for this crop.");
+                    ricePotassium.put("high", "Suitable for this crop.");
+                    potassiumRecommendations.put("Rice", ricePotassium);
+
+
+
+
+
+
+                    if (lineChart != null) {
+                        DatabaseReference databaseRef1 = FirebaseDatabase.getInstance("https://fir-69a61-default-rtdb.firebaseio.com/")
+                                .getReference("NutriSens/npk");
+
+                        databaseRef1.addValueEventListener(new ValueEventListener() {
+
+                            @Override
+                            public void onDataChange(DataSnapshot dataSnapshot) {
+
+
+
+                                if (dataSnapshot.exists()) {
+                                    Double potassiumValueDouble = dataSnapshot.child("K").getValue(Double.class);
+                                   Double nitrogenValue = dataSnapshot.child("N").getValue(Double.class);
+                                    Double phosValue = dataSnapshot.child("P").getValue(Double.class);
+                                    Double pHValueObject = dataSnapshot.child("pH").getValue(Double.class);
+
+
+                                    if (pHValueObject != null) {
+                                        pHValue = pHValueObject.doubleValue();
+                                        pHValue = Math.max(1.0, Math.min(pHValue, 8.0));
+            //                            float adjustedPH = Math.max(1f, Math.min((float) pHValue, 8f));
+                                        float progressFloat = ((float)pHValue - 1f) * (100f / 7f);
+                                        int progress = Math.round(progressFloat);
+                                        progressBarpH.setProgress(progress);
+
+                                        if (pHValue <= 3.5f) {
+                                            progressBarpH.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
+                                        } else if (pHValue >= 5.5f) {
+                                            progressBarpH.setProgressTintList(ColorStateList.valueOf(Color.YELLOW));
+                                        } else {
+                                            progressBarpH.setProgressTintList(ColorStateList.valueOf(Color.GREEN));
+                                        }
+                                        tvPHValue.setText("pH: " + String.format("%.2f", pHValue));
+                                    }
+
+                                   if (nitrogenValue != null) {
+                                        float nitrogenValueFloat = Math.max(0f, Math.min(nitrogenValue.floatValue(), 6f));
+                                        nitrogenEntries.clear();
+                                        nitrogenEntries.add(new Entry(0f, 0f));
+//                                        nitrogenEntries.add(new Entry(1f, nitrogenValueFloat));
+
+                                       float xValue = 0f; // Default value for "0"
+                                       if (nitrogenValueFloat >= 0 && nitrogenValueFloat <= 2) {
+                                           xValue = 1f; // Midpoint of "0-2"
+                                       } else if (nitrogenValueFloat > 2 && nitrogenValueFloat <= 3.5) {
+                                           xValue = 2.75f; // Midpoint of "2.1-3.5"
+                                       } else if (nitrogenValueFloat > 3.5 && nitrogenValueFloat <= 4.5) {
+                                           xValue = 4f; // Midpoint of "3.5-4.5"
+                                       } else if (nitrogenValueFloat> 4.5 && nitrogenValueFloat <= 5.5) {
+                                           xValue = 5f; // Midpoint of "4.6-5.5"
+                                       } else {
+                                           xValue = 6f; // For ">5.5"
+                                       }
+
+                                       nitrogenEntries.add(new Entry(xValue, nitrogenValueFloat));
+
+
+
+
+                                        //recomended
+                                        String selectedCrop = getIntent().getStringExtra("selectedCrop");
+                                        String nitrogenLevel = "";
+
+                                        Log.d("FourthPage", "selectedCrop: " + selectedCrop);
+                                        Log.d("FourthPage", "nitrogenLevel: " + nitrogenLevel);
+
+
+                                        if (nitrogenValueFloat >= 0 && nitrogenValueFloat <= 2){
+                                            nitrogenLevel = "low";
+                                        } else if (nitrogenValueFloat > 2 && nitrogenValueFloat <= 3.5) {
+                                            nitrogenLevel ="midlow";
+                                        }else if (nitrogenValueFloat > 3.5 && nitrogenValueFloat <= 4.5){
+                                            nitrogenLevel = "midhigh";
+                                        }else if(nitrogenValueFloat > 4.5 && nitrogenValueFloat <= 5.5){
+                                            nitrogenLevel = "high";
+                                        }
+                                        else {
+                                            nitrogenLevel = "veryhigh";
+                                        }
+
+
+
+                                        if (NitrogenRecommendations != null && NitrogenRecommendations.containsKey(selectedCrop)) {
+                                            Map<String, String> cropRecommendations = NitrogenRecommendations.get(selectedCrop);
+                                            if (cropRecommendations != null && cropRecommendations.containsKey(nitrogenLevel)) {
+                                                String fertilizerAmount = cropRecommendations.get(nitrogenLevel);
+                                                // ... use fertilizerAmount ...
+
+                                                TextView tvFertilizerRecommendation = findViewById(R.id.tvRecommendedNitro);
+                                                tvFertilizerRecommendation.setText(" This Nitrogen is  " + fertilizerAmount);
+                                            } else {
+                                                // Handle case where nitrogenLevel is not found or cropRecommendations is null
+                                            }
+                                        } else {
+                                            // Handle case where selectedCrop is not found or fertilizerRecommendations is null
+                                        }
+
+
+
+
+
+                                        String fertilizerAmount = NitrogenRecommendations.get(selectedCrop).get(nitrogenLevel);
+
+                                        TextView tvFertilizerRecommendation = findViewById(R.id.tvRecommendedNitro); // Make sure you have this TextView in your layout
+                                        tvFertilizerRecommendation.setText("This Nitrogen is " + fertilizerAmount);
+
+                                        LineDataSet nitrogenDataSet = new LineDataSet(nitrogenEntries, "Nitrogen"); // Correct label
+                                        nitrogenDataSet.setValueTextSize(14f);
+                                        nitrogenDataSet.setValueTextColor(Color.BLUE);
+                                        nitrogenDataSet.setValueTypeface(Typeface.SANS_SERIF);
+                                        nitrogenDataSet.setDrawValues(true);
+                                        nitrogenDataSet.setColor(Color.BLUE);
+
+
+
+                                        styleLineChart(linechartNitro, nitrogenDataSet);
+
+                                        LineData nitrogenLineData = new LineData(nitrogenDataSet);
+
+                                        linechartNitro.setData(nitrogenLineData);
+                                        linechartNitro.invalidate();
+
+
+
+                                    }
+
+                                    if (phosValue != null) {
+                                        float phosValueFloat = Math.max(0f, Math.min(phosValue.floatValue(), 20.05f));
+                                        phosEntries.clear();
+                                        phosEntries.add(new Entry(0f, 0f));
+//                                        phosEntries.add(new Entry(1f, phosValueFloat));
+
+                                        float xValue = 0f;
+                                        if (phosValueFloat == 0) {
+                                            xValue = 0f;
+                                        } else if (phosValueFloat > 0 && phosValueFloat <= 2) {
+                                            xValue = 1f;
+                                        } else if (phosValueFloat > 2 && phosValueFloat <= 6) {
+                                            xValue = 2f;
+                                        } else if (phosValueFloat > 6 && phosValueFloat <= 10) {
+                                            xValue = 3f;
+                                        } else if (phosValueFloat > 10 && phosValueFloat <= 15.1) {
+                                            xValue = 4f;
+                                        } else {
+                                            xValue = 5f;
+                                        }
+
+                                        phosEntries.add(new Entry(xValue, phosValueFloat));
+//                                        phosEntries.add(new Entry(phosValueFloat, xValue));
+
+
+
+
+
+
+                                        String selectedCrop = getIntent().getStringExtra("selectedCrop");
+                                        String phosphorusLevel = "";
+
+                                        // Determine phosphorusLevel using phosValueFloat
+                                        if (phosValueFloat >= 0 && phosValueFloat <= 2){
+                                            phosphorusLevel = "low";
+                                        } else if (phosValueFloat > 2.1 && phosValueFloat <= 10) {
+                                            phosphorusLevel ="mid";
+                                        } else {
+                                            phosphorusLevel = "high";
+                                        }
+
+                                        String phosphorusAmount = phosphorusRecommendations.get(selectedCrop).get(phosphorusLevel);
+
+                                        TextView tvPhosphorusRecommendation = findViewById(R.id.tvRecommendedPhos);
+                                        tvPhosphorusRecommendation.setText("This Phosphorus is " + phosphorusAmount);
+
+
+
+
+
+                                        LineDataSet phorusDataSet = new LineDataSet(phosEntries, "Phosphorus"); // Correct label
+                                        phorusDataSet.setValueTextSize(14f);
+                                        phorusDataSet.setValueTextColor(Color.BLUE);
+                                        phorusDataSet.setValueTypeface(Typeface.SANS_SERIF);
+                                        phorusDataSet.setDrawValues(true);
+                                        phorusDataSet.setColor(Color.GREEN);
+
+
+
+                                        styleLineChart(linechartPhos, phorusDataSet);
+
+                                        LineData phosLineData = new LineData(phorusDataSet);
+                                        linechartPhos.setData(phosLineData);
+                                        linechartPhos.invalidate();
+                                    }
+
+//
+                                    if (potassiumValueDouble != null) {
+//                                        float potassiumValueFloat = potassiumValueDouble.floatValue(); // Assign value here
+//                                        potassiumValue = potassiumValueDouble.floatValue();
+                                        float potassiumValueFloat = Math.max(0f, Math.min(potassiumValueDouble.floatValue(), 100f));
+                                        potassiumEntries.clear();
+                                        potassiumEntries.add(new Entry(0f, 0f));
+//                                        potassiumEntries.add(new Entry(1f, potassiumValue));
+
+
+
+                                        float xValue = 0f; // Default value for "D"
+                                        if (potassiumValueFloat >= 0 && potassiumValueFloat <= 25) {
+                                            xValue = 1f; // For "D"
+                                        } else if (potassiumValueFloat > 25 && potassiumValueFloat <= 50) {
+                                            xValue = 2f; // For "S"
+                                        } else if (potassiumValueFloat > 50 && potassiumValueFloat <= 75) {
+                                            xValue = 3f; // For "S+"
+                                        } else if (potassiumValueFloat > 75 && potassiumValueFloat <= 100) {
+                                            xValue = 4f; // For "S++"
+                                        }// Add more cases if needed
+
+                                        potassiumEntries.add(new Entry(xValue, potassiumValueFloat));
+
+
+                                        TextView tvPotassiumRecommendation = findViewById(R.id.tvRecommendedPotass);
+
+
+                                        String selectedCrop = getIntent().getStringExtra("selectedCrop");
+                                        String potassiumLevel = "";
+
+
+
+                                        if (potassiumValueFloat >=0 && potassiumValueFloat <= 25) {
+                                            potassiumLevel = "low";
+                                        } else if (potassiumValueFloat > 25 && potassiumValueFloat <= 75) {
+                                            potassiumLevel = "mid";
+                                        } else {
+                                            potassiumLevel = "high";
+                                        }
+
+
+
+
+                                        String potassiumAmount = potassiumRecommendations.get(selectedCrop).get(potassiumLevel);
+
+
+                                        tvPotassiumRecommendation.setText("This Potassium is " + potassiumAmount);
+                                        Log.d("FourthPage", "Potassium recommendation set: " + potassiumAmount);
+
+
+
+
+                                        LineDataSet potassiumDataSet = new LineDataSet(potassiumEntries, "Potassium"); // Correct label
+                                        potassiumDataSet.setValueTextSize(14f);
+                                        potassiumDataSet.setValueTextColor(Color.BLUE);potassiumDataSet.setValueTypeface(Typeface.SANS_SERIF);
+                                        potassiumDataSet.setDrawValues(true);
+                                        potassiumDataSet.setColor(Color.RED); // Example color
+
+                                        styleLineChart(lineChart, potassiumDataSet);
+
+                                        LineData lineData = new LineData(potassiumDataSet);
+                                        lineChart.setData(lineData);
+                                        lineChart.invalidate();
+                                    }
+
+
+
+
+                                } else {
+                                    // Handle case where data is not found
+                                }
+
+
+                            }
+
+
+                            private void styleLineChart(LineChart lineChart, LineDataSet dataSet) {
+                                dataSet.setValueTextColor(Color.BLUE);
+
+                                lineChart.getXAxis().setTextColor(Color.BLACK);
+                                lineChart.getAxisLeft().setTextColor(Color.BLACK);
+                                lineChart.getAxisRight().setTextColor(Color.BLACK);
+                                lineChart.getLegend().setTextColor(Color.BLACK);
+                                lineChart.getDescription().setTextColor(Color.BLACK);
+
+                            }
+
+
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                Log.e("FourthPage", "Error reading Nitrogen value: ", error.toException());
+                            }
+
+
+
+                        });
+
+
+                        //potas
+
+
+                        YAxis yAxisLeftPotassium = lineChart.getAxisLeft(); // Assuming 'lineChart' is your Potassium chart
+                        yAxisLeftPotassium.setValueFormatter(new ValueFormatter() {
+                            @Override
+                            public String getFormattedValue(float value) {
+                                if (value == 0) {
+                                    return "0 ";
+                                } else if (value > 0 && value <= 25) {
+                                    return "D ";
+                                } else if (value > 25 && value <= 50) {
+                                    return "S ";
+                                } else if (value > 50 && value <= 75) {
+                                    return "S+ ";
+                                } else if (value > 75 && value <= 100) {
+                                    return "S++ ";
+                                } else if (value > 110) { // New case for > 100
+                                    return"S+++ ";
+                                } else {
+                                    return "";
+                                }
+                            }
+                        });
+
+                        yAxisLeftPotassium.setAxisMinimum(0f);
+                        yAxisLeftPotassium.setAxisMaximum(110f); // Adjust if necessary
+                        yAxisLeftPotassium.setLabelCount(7, true);
+                        yAxisLeftPotassium.setGridColor(Color.BLACK);
+
+
+                        XAxis xAxisPotassium = lineChart.getXAxis(); // Assuming 'lineChart' is your Potassium chart
+                        xAxisPotassium.setValueFormatter(new ValueFormatter() {
+                            @Override
+                            public String getFormattedValue(float value) {
+                                int index = (int) value;
+                                switch (index) {
+                                    case 0:
+                                        return "0";
+                                    case 1:
+                                        return "D\n0-25";
+                                    case 2:
+                                        return "S\n26-50";
+                                    case 3:
+                                        return "S+\n51-75";
+                                    case 4:
+                                        return "S++\n76-100";
+                                    case 5:
+                                        return "S+++";
+                                    default:return "";
+                                }
+                            }
+                        });
+
+                        xAxisPotassium.setAxisMinimum(0f);
+                        xAxisPotassium.setAxisMaximum(6f); // Adjust if necessary
+                        xAxisPotassium.setLabelCount(7, true);
+                        xAxisPotassium.setPosition(XAxis.XAxisPosition.BOTTOM);
+                        xAxisPotassium.setGridColor(Color.BLACK);
+
+                        lineChart.getAxisRight().setEnabled(false); //remove right value
+
+
+
+
+                        //nitro
+                        YAxis yAxisLeftNitro = linechartNitro.getAxisLeft();
+
+                        yAxisLeftNitro.setValueFormatter(new ValueFormatter() {   @Override
+                        public String getFormattedValue(float value) {
+                            if (value == 0) {
+                                return "0 ";}
+                            else if (value > 0 && value <= 2) {
+                                return "L ";
+                            } else if (value > 2 && value <= 3.5) {
+                                return "ML ";
+                            } else if (value > 3.5 && value <= 4.5) {
+                                return "MH ";
+                            } else if (value > 4.5 && value <= 5.5) {
+                                return "H ";
+                            } else {
+                                return "VH ";
+                            }
+
+                        }
+                        });
+
+                        yAxisLeftNitro.setAxisMinimum(0f);
+                        yAxisLeftNitro.setAxisMaximum(6f);
+                        yAxisLeftNitro.setLabelCount(6, true); // Or adjust as needed
+                        yAxisLeftNitro.setGridColor(Color.BLACK);
+
+
+                        XAxis xAxis = linechartNitro.getXAxis();
+
+                        xAxis.setValueFormatter(new ValueFormatter() {
+                            @Override
+                            public String getFormattedValue(float value) {
+                                int index = (int) value; // Convert value to index (0, 1, 2, 3...)
+
+                                switch (index) {
+                                    case 0:
+                                        return "0";
+                                    case 1:
+                                        return "L\n0-2"; // Added "L"and newline
+                                    case 2:
+                                        return "ML\n2.1-3.5"; // Added "ML" and newline
+                                    case 3:
+                                        return "MH\n3.5-4.5"; // Added "MH" and newline
+                                    case 4:
+                                        return "H\n4.6-5.5"; // Added "H" and newline
+                                    case 5:
+                                        return "VH\n>5.5"; // Added "VH" and newline
+                                    default:
+                                        return ""; // Return empty string for values outside the range
+                                }
+                            }
+                        });
+
+
+                        xAxis.setAxisMinimum(0f);
+                        xAxis.setAxisMaximum(6f);
+                        xAxis.setGridColor(Color.BLACK);
+                        xAxis.setTextColor(Color.BLACK);
+
+
+
+                        linechartNitro.invalidate();
+                        xAxis.setLabelCount(7, true);
+                        linechartNitro.getAxisRight().setEnabled(false); // Disable left axis labels
+
+                        linechartNitro.getXAxis().setPosition(XAxis.XAxisPosition.BOTTOM);
+
+
+
+
+
+
+
+                        //phos
+                        YAxis yAxisLeftPhos = linechartPhos.getAxisLeft();
+
+                        yAxisLeftPhos.setValueFormatter(new ValueFormatter() {
+                            @Override
+                            public String getFormattedValue(float value) {
+                                if (value == 0) {
+                                    return "0";
+                                } else if (value > 0 && value <= 2) {
+                                    return "L";
+                                } else if (value > 2 && value <= 6) { // Adjusted range
+                                    return "ML";
+                                } else if (value > 6 && value <= 10) {
+                                    return "MH";
+                                } else if (value > 10 && value <= 15.1) {
+                                    return "H";
+                                } else if (value > 15.1 && value <= 20) {
+                                    return "VH";
+                                } else {
+                                    return "";
+                                }
+                            }
+                        });
+
+
+                        yAxisLeftPhos.setAxisMinimum(0f);
+                        yAxisLeftPhos.setAxisMaximum(21f);
+                        yAxisLeftPhos.setLabelCount(6, true);
+                        yAxisLeftPhos.setGridColor(Color.BLACK);
+
+
+
+
+                        XAxis xAxisPhos = linechartPhos.getXAxis();
+
+
+                        xAxisPhos.setValueFormatter(new ValueFormatter() {
+                            @Override
+                            public String getFormattedValue(float value) {
+                                int index = (int) value;
+                                switch (index) {
+                                    case 0:
+                                        return "0";
+                                    case 1:
+                                        return "L\n0-2";
+                                    case 2:
+                                        return "ML\n2.1-6";
+                                    case 3:
+                                        return "MH\n6.1-10";
+                                    case 4:
+                                        return "H\n10.1-15.1";
+                                    case 5:
+                                        return "VH\n15.1->20";
+                                    default:
+                                        return "";
+                                }
+                            }
+                        });
+
+
+
+                        xAxisPhos.setAxisMinimum(0f);
+                        xAxisPhos.setAxisMaximum(6f); // Adjust if necessary
+                        xAxisPhos.setLabelCount(7, true);
+                        xAxisPhos.setPosition(XAxis.XAxisPosition.BOTTOM);
+                        xAxisPhos.setGranularity(1f); // only intervals of 1 day
+                        xAxisPhos.setTextColor(Color.BLACK);
+                        xAxisPhos.setGridColor(Color.BLACK);
+                        linechartPhos.getAxisRight().setEnabled(false);
+
+                        } else {
+                            Log.e("MainActivity", "LineChart view not found!");
+                        }
+
+
+
+                        //Image display
+                        ImageView imageViewInFourthPage = findViewById(R.id.ivfourth);
+                        int receivedImageResourceId = getIntent().getIntExtra("imageResourceId", R.drawable.default_image);
+                        imageViewInFourthPage.setImageResource(receivedImageResourceId);
+
+
+
+                        TextView textViewSelectedCrop = findViewById(R.id.tvShowcrop);
+                        String receivedCrop = getIntent().getStringExtra("selectedCrop");
+
+                        if (receivedCrop != null) {
+                            textViewSelectedCrop.setText("CROP: " + receivedCrop);
+                        }
+
+
+
+
+                        Button buttonsave = findViewById(R.id.btnSave);
+
+                        buttonsave.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+
+
+                                DatabaseReference databaseReference;
+                                databaseReference = FirebaseDatabase.getInstance().getReference();
+
+    //                            String receivedUsername = getIntent().getStringExtra("EXTRA_USERNAME");
+
+                                String crop = textViewSelectedCrop.getText().toString();
+                                int imageResourceId = getIntent().getIntExtra("imageResourceId", 0);
+
+                                long currentTime = System.currentTimeMillis();
+
+                                potassiumValue = lineChart.getData().getDataSetByIndex(0).getEntryForIndex(lineChart.getData().getDataSetByIndex(0).getEntryCount() - 1).getY();
+                                nitrogenValue = linechartNitro.getData().getDataSetByIndex(0).getEntryForIndex(linechartNitro.getData().getDataSetByIndex(0).getEntryCount() - 1).getY();
+                                phosphorusValue = linechartPhos.getData().getDataSetByIndex(0).getEntryForIndex(linechartPhos.getData().getDataSetByIndex(0).getEntryCount() - 1).getY();
+
+
+                                // 2. Create a HistoryItem object
+                                HistoryItem historyItem = new HistoryItem(crop, imageResourceId, currentTime, nitrogenValue, phosphorusValue, potassiumValue, pHValue);
+
+                                databaseReference.child("users").child("history").push().setValue(historyItem)
+                                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                            @Override
+                                            public void onComplete(@NonNull Task<Void> task) {
+                                                if (task.isSuccessful()) {
+            //                                    Toast.makeText(FourthPage.this, "Activity saved to history", Toast.LENGTH_SHORT).show();
+
+                                                    MotionToast.Companion.darkToast(FourthPage.this,
+                                                            "Success 😍",
+                                                            "Successfully Saved, here's your history",
+                                                            MotionToastStyle.SUCCESS,
+                                                            MotionToast.GRAVITY_TOP,
+                                                            MotionToast.SHORT_DURATION,
+                                                            ResourcesCompat.getFont(FourthPage.this, www.sanju.motiontoast.R.font.helveticabold));
+
+
+                                                    Log.d("FourthPage", "Starting FifthActivity");
+                                                    // 4. Start FifthActivity
+                                                    Intent intent = new Intent(FourthPage.this, FifthActivity.class);
+    //                                                intent.putExtra("EXTRA_USERNAME", receivedUsername);
+    //                                                intent.putExtra(EXTRA_NAME, receivedUsername);
+
+
+                                                    intent.putExtra("nitrogenValue", nitrogenValue);
+                                                    intent.putExtra("phosphorusValue", phosphorusValue);
+                                                    intent.putExtra("potasValue", potassiumValue);
+                                                    intent.putExtra("pHValue", pHValue);
+
+
+                                                    startActivity(intent);
+                                                    Log.d("FourthPage", "FifthActivity started");
+
+
+                                                    overridePendingTransition(R.anim.lefttoright, R.anim.righttoleft);
+
+                                                } else {
+                                                    Toast.makeText(FourthPage.this, "Failed to save activity", Toast.LENGTH_SHORT).show();
+                                                }
+
+                                            }
+                                        });
+
+
+                            }
+
+                        });
+
+
+
+
+
+
+
+
+
+
+                    }
+
+
+                }
+
+
